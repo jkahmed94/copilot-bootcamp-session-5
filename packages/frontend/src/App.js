@@ -24,16 +24,18 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import './App.css';
 
-// INTENTIONAL ISSUE: API_URL should use environment variable or relative URL
-const API_URL = 'http://localhost:3001/api/todos';
+// Use relative URL for API calls
+const API_URL = '/api/todos';
 
 // React Query hook for fetching todos
 const useTodos = () => {
   return useQuery({
     queryKey: ['todos'],
-    // INTENTIONAL ISSUE: Missing error handling in query
     queryFn: async () => {
       const response = await fetch(API_URL);
+      if (!response.ok) {
+        throw new Error('Failed to fetch todos');
+      }
       const data = await response.json();
       return data;
     },
@@ -45,7 +47,7 @@ function App() {
   const queryClient = useQueryClient();
 
   // Fetch todos using React Query
-  const { data: todos = [], isLoading } = useTodos();
+  const { data: todos = [], isLoading, error } = useTodos();
 
   // Mutation for adding a new todo
   const addTodoMutation = useMutation({
@@ -76,12 +78,16 @@ function App() {
     },
   });
 
-  // INTENTIONAL ISSUE: Delete mutation not implemented
+  // Delete mutation implementation
   const deleteTodoMutation = useMutation({
     mutationFn: async (id) => {
-      // TODO: Implement delete functionality
-      console.log('Delete todo:', id);
-      // Missing: await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete todo');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todos'] });
@@ -105,6 +111,10 @@ function App() {
 
   // INTENTIONAL ISSUE: Edit functionality not implemented
   // const handleEditTodo = (id, newTitle) => { ... }
+
+  // Calculate stats from todos
+  const itemsLeft = todos.filter((todo) => !todo.completed).length;
+  const completedCount = todos.filter((todo) => todo.completed).length;
 
   return (
     <Box
@@ -166,7 +176,25 @@ function App() {
           </Box>
         )}
 
-        {/* INTENTIONAL ISSUE: No empty state message when todos.length === 0 */}
+        {error && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography color="error" align="center">
+                Error loading todos. Please try again later.
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isLoading && !error && todos.length === 0 && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography align="center" color="text.secondary">
+                No todos yet! Add one above to get started.
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <List sx={{ p: 0 }}>
@@ -199,6 +227,7 @@ function App() {
                   <IconButton
                     size="small"
                     color="primary"
+                    aria-label="edit"
                     onClick={() => console.log('Edit not implemented')}
                   >
                     <EditIcon />
@@ -206,6 +235,7 @@ function App() {
                   <IconButton
                     size="small"
                     color="error"
+                    aria-label="delete"
                     onClick={() => handleDeleteTodo(todo.id)}
                   >
                     <DeleteIcon />
@@ -216,10 +246,10 @@ function App() {
           </List>
         </Card>
 
-        {/* INTENTIONAL ISSUE: Stats always show 0 instead of calculating from todos */}
+        {/* Stats showing calculated values from todos */}
         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 2 }}>
-          <Chip label={`${0} items left`} color="primary" />
-          <Chip label={`${0} completed`} color="success" />
+          <Chip label={`${itemsLeft} items left`} color="primary" />
+          <Chip label={`${completedCount} completed`} color="success" />
         </Box>
       </Container>
     </Box>
